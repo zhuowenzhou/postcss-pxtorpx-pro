@@ -1,5 +1,6 @@
 const postcss = require("postcss");
 const pxRegex = require("./lib/pixel-unit-regex");
+const rpxRegex = require("./lib/response-pixel-unit-regex");
 const filterPropList = require("./lib/filter-prop-list");
 const type = require("./lib/type");
 
@@ -14,13 +15,24 @@ const defaults = {
   minPixelValue: 0,
   exclude: null,
   // 默认设计稿按照750宽，2倍图的出
-  transform: x => 2 * x
+  transform: x => 2 * x,
+  sourceUnit: "px"
 };
+
+let unitReg = '';
+
+function setUnitReg(unitType) {
+  const map = {
+    "px": pxRegex,
+    "rpx": rpxRegex
+  };
+  unitReg = map[unitType] || pxRegex;
+}
 
 module.exports = postcss.plugin("postcss-pxtorpx", options => {
   const opts = Object.assign({}, defaults, options);
   const unsatisfyPropList = createPropListMatcher(opts.propBlackList);
-
+  setUnitReg(opts.sourceUnit);
   return css => {
     const exclude = opts.exclude;
     const filePath = css.source.input.file;
@@ -33,7 +45,7 @@ module.exports = postcss.plugin("postcss-pxtorpx", options => {
       return;
     }
 
-    const pxReplaceFunc = createPxReplace(
+    const unitReplaceFunc = createUnitReplace(
       opts.unit,
       opts.unitPrecision,
       opts.minPixelValue,
@@ -42,13 +54,13 @@ module.exports = postcss.plugin("postcss-pxtorpx", options => {
 
     css.walkDecls((decl, i) => {
       if (
-        decl.value.indexOf("px") === -1 ||
+        decl.value.indexOf(opts.sourceUnit) === -1 ||
         unsatisfyPropList(decl.prop) ||
         blacklistedSelector(opts.selectorBlackList, decl.parent.selector)
       )
         return;
 
-      const value = decl.value.replace(pxRegex, pxReplaceFunc);
+      const value = decl.value.replace(unitReg, unitReplaceFunc);
 
       // if rem unit already exists, do not add or replace
       if (declarationExists(decl.parent, decl.prop, value)) return;
@@ -62,14 +74,14 @@ module.exports = postcss.plugin("postcss-pxtorpx", options => {
 
     if (opts.mediaQuery) {
       css.walkAtRules("media", rule => {
-        if (rule.params.indexOf("px") === -1) return;
-        rule.params = rule.params.replace(pxRegex, pxReplaceFunc);
+        if (rule.params.indexOf(opts.sourceUnit) === -1) return;
+        rule.params = rule.params.replace(unitReg, unitReplaceFunc);
       });
     }
   };
 });
 
-function createPxReplace(unit, unitPrecision, minPixelValue, transform) {
+function createUnitReplace(unit, unitPrecision, minPixelValue, transform) {
   return (m, $1) => {
     if (!$1) return m;
     const pixels = parseFloat($1);
@@ -117,24 +129,24 @@ function createPropListMatcher(propList) {
     return (
       (hasWild ||
         lists.exact.indexOf(prop) > -1 ||
-        lists.contain.some(function(m) {
+        lists.contain.some(function (m) {
           return prop.indexOf(m) > -1;
         }) ||
-        lists.startWith.some(function(m) {
+        lists.startWith.some(function (m) {
           return prop.indexOf(m) === 0;
         }) ||
-        lists.endWith.some(function(m) {
+        lists.endWith.some(function (m) {
           return prop.indexOf(m) === prop.length - m.length;
         })) &&
       !(
         lists.notExact.indexOf(prop) > -1 ||
-        lists.notContain.some(function(m) {
+        lists.notContain.some(function (m) {
           return prop.indexOf(m) > -1;
         }) ||
-        lists.notStartWith.some(function(m) {
+        lists.notStartWith.some(function (m) {
           return prop.indexOf(m) === 0;
         }) ||
-        lists.notEndWith.some(function(m) {
+        lists.notEndWith.some(function (m) {
           return prop.indexOf(m) === prop.length - m.length;
         })
       )

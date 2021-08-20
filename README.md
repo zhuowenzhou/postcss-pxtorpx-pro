@@ -89,7 +89,9 @@ Default:
   exclude: null,
   // 转化函数
   // 默认设计稿按照750宽，2倍图的出
-  transform: (x) => 2*x
+  transform: (x) => 2*x,
+  // 源单位 目前支持 "px", "rpx"
+  sourceUnit: "px"
 }
 ```
 - `unit`(String) The unit transform to. default `rpx`.
@@ -117,7 +119,7 @@ Default:
     - If value is function, you can use exclude function to return a true and the file will be ignored.
         - the callback will pass the file path as  a parameter, it should returns a Boolean result.
         - `function (file) { return file.indexOf('exclude') !== -1; }`
-
+- `sourceUnit`(String) The unit want to transform . default `px`.
 ### Use with gulp-postcss and autoprefixer
 
 ```js
@@ -159,8 +161,26 @@ Currently, the easiest way to have a single property ignored is to use a capital
 }
 ```
 
+### 小程序rpx2px
+``` javascript
+var gulp = require('gulp');
+var postcss = require('gulp-postcss');
+var pxtorpx = require('postcss-pxtorpx-pro');
 
-### REF
+gulp.task('css', function () {
+    var processors = [
+        pxtorpx({
+            // 目标单位
+            unit: "px",
+            replace: true,  //直接替换原来的规则
+            transform: (x) => x / 2 , //750rpx / 2 = 375px
+            // 源单位
+            sourceUnit: "rpx"
+        })
+    ];
+    return gulp.src(['pages/**/*.wxss'])
+        .pipe(postcss(processors))
+        .pipe(gulp.dest('pages'));
+});
 
-开发本插件之前，没有留意到已经有童鞋做了一个[类似的](https://github.com/dnxbf321/postcss-pxtorpx), 不过看下功能，本插件应该更加强大一些，故取其同名加pro。
-
+```
